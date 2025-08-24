@@ -1,4 +1,4 @@
-# backend/utils/pdf_processor.py
+
 
 import fitz  # PyMuPDF
 import os

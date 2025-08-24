@@ -1,98 +1,98 @@
 # backend/utils/ai_client.py
 
-import google.generativeai as genai
 import os
+import json
+import google.generativeai as genai
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
+# Load environment variables from a .env file
 load_dotenv()
 
-# --- Configuration ---
-# Get the API key from environment variables
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY not found. Please set it in your .env file.")
-
-# Configure the generative AI model with your API key
-genai.configure(api_key=GEMINI_API_KEY)
-
-# --- Main AI Client Class ---
 class GeminiClient:
     """
-    A client to interact with the Google Gemini API.
+    A client to interact with the Google Gemini API, specifically tuned
+    for the Saral Kanoon application.
     """
-
-    def __init__(self, model_name="gemini-2.5-pro"):
+    def __init__(self, model_name="gemini-2.5-flash"):
         """
-        Initializes the Gemini client with a specified model.
-        Args:
-            model_name (str): The name of the Gemini model to use (default is "gemini-pro").
+        Initializes the Gemini client.
         """
+        GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+        if not GEMINI_API_KEY:
+            raise ValueError("GEMINI_API_KEY not found. Please set it in your .env file.")
+        
+        genai.configure(api_key=GEMINI_API_KEY)
         self.model = genai.GenerativeModel(model_name)
-    
-    def generate_response(self, text_to_analyze: str) -> str:
+
+    def analyze_document(self, document_text: str) -> dict:
         """
-        Sends text to the Gemini model and returns the generated response.
-        
-        Args:
-            text_to_analyze (str): The input text to be sent to the model.
-        
-        Returns:
-            str: The text response from the Gemini model, or an error message.
+        Analyzes the full text of a legal document and returns a structured JSON.
+        """
+        # This is a highly-tuned prompt for structured JSON output.
+        prompt = f"""
+        **Instruction:**
+        You are an expert legal assistant named "Saral Kanoon" for an Indian audience. Your task is to analyze the provided legal document text and return a valid JSON object.
+        The JSON object must have three keys: "summary", "keyClauses", and "redFlags".
+
+        1.  **summary**: A concise, easy-to-understand summary of the document's main purpose in plain English.
+        2.  **keyClauses**: An array of objects, where each object represents one of the 3-5 most important clauses. Each object must have a "title" and a "detail" explaining its impact on the user.
+        3.  **redFlags**: An array of objects identifying clauses that are risky, unfair, or unusual. Each object must have a "title" and a "detail" explaining the potential risk. If there are no red flags, return an empty array.
+
+        **Document Text to Analyze:**
+        ---
+        {document_text}
+        ---
+
+        **JSON Response:**
         """
         try:
-            prompt = self._create_prompt(text_to_analyze)
             response = self.model.generate_content(prompt)
-            # Access the text from the response object
-            return response.text
+            # Clean the response to ensure it's valid JSON
+            cleaned_response = response.text.strip().replace("```json", "").replace("```", "").strip()
+            return json.loads(cleaned_response)
+        except json.JSONDecodeError:
+            print("Error: Failed to decode JSON from AI response.")
+            return {"error": "Could not parse the AI's analysis."}
         except Exception as e:
-            print(f"Error communicating with Gemini API: {e}")
-            return "An error occurred while processing the request."
-            
-    def _create_prompt(self, document_text: str) -> str:
-        """
-        Formats the input text into a specific prompt for the Gemini model.
-        
-        Args:
-            document_text (str): The text extracted from the PDF.
-        
-        Returns:
-            str: The final prompt string.
-        """
-        # You can customize this prompt based on your application's needs
-        # For a legal document, you might ask for a summary, key clauses, etc.
-        prompt = (
-            "You are a helpful legal assistant. Analyze the following legal document "
-            "and provide a concise summary of its key points, obligations, "
-            "and any important dates or terms. Use bullet points for clarity.\n\n"
-            f"Document Text:\n---\n{document_text}\n---"
-        )
-        return prompt
+            print(f"Error during analysis: {e}")
+            return {"error": "An error occurred during document analysis."}
 
-# --- Example Usage (for testing this file directly) ---
+    def answer_question(self, document_text: str, user_question: str) -> str:
+        """
+        Answers a user's question based ONLY on the provided document context.
+        """
+        prompt = f"""
+        **Instruction:**
+        You are a Q&A assistant for "Saral Kanoon". Answer the user's question based *ONLY* on the provided document text.
+        Do not use any external knowledge. If the answer is not in the document, you MUST state: "The answer to that question could not be found in the provided document."
+
+        **Document Text:**
+        ---
+        {document_text}
+        ---
+
+        **User's Question:**
+        "{user_question}"
+
+        **Answer:**
+        """
+        try:
+            response = self.model.generate_content(prompt)
+            return response.text.strip()
+        except Exception as e:
+            print(f"Error during Q&A: {e}")
+            return "Sorry, an error occurred while answering your question."
+
+# --- Example Usage (for testing) ---
 if __name__ == '__main__':
-    # This example assumes you have a .env file with GEMINI_API_KEY=YOUR_API_KEY
-    print("--- Testing Gemini Client ---")
-    
-    # 1. Instantiate the client
     client = GeminiClient()
+    sample_text = "This agreement has a lock-in period of 6 months. If the Tenant vacates before this period, the security deposit shall be forfeited."
     
-    # 2. Prepare some sample text (you would get this from pdf_processor.py)
-    sample_text = (
-        "This Rental Agreement is made on August 23, 2025, between Landlord: Jane Doe "
-        "and Tenant: John Smith. The property is located at 123 Main St. "
-        "The rent is $1,500 per month, payable on the 1st of each month. "
-        "The lease term is 12 months, starting September 1, 2025. "
-        "A security deposit of $1,500 is required. No pets are allowed."
-    )
-    
-    # 3. Get a response from the model
-    print("\nSending sample text to Gemini...")
-    response_text = client.generate_response(sample_text)
-    
-    # 4. Print the response
-    print("\nResponse from Gemini:")
-    print("----------------------")
-    print(response_text)
-    print("----------------------")
+    print("--- Testing Analysis ---")
+    analysis = client.analyze_document(sample_text)
+    print(json.dumps(analysis, indent=2))
+
+    print("\n--- Testing Q&A ---")
+    question = "What happens if I leave early?"
+    answer = client.answer_question(sample_text, question)
+    print(f"Q: {question}\nA: {answer}")

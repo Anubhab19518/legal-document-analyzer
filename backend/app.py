@@ -1,63 +1,97 @@
-# saral_kanoon/backend/app.py
+# backend/app.py
 
-import os
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from utils.pdf_processor import extract_text_from_pdf
 from utils.ai_client import GeminiClient
 
-# Initialize the Flask application
+# Initialize Flask App and CORS
 app = Flask(__name__)
+# This is crucial to allow your React frontend to communicate with this backend
+CORS(app) 
+
+# In-memory storage for the extracted text of the last uploaded document.
+# For a hackathon, this is sufficient. For production, you'd use a more robust cache like Redis.
+document_context_store = {
+    "text": None
+}
+
+# Initialize the AI client once
+try:
+    ai_client = GeminiClient()
+except ValueError as e:
+    print(f"Failed to initialize GeminiClient: {e}")
+    ai_client = None
 
 # --- API Endpoints ---
 
-@app.route('/upload', methods=['POST'])
-def upload_pdf_and_get_summary():
+@app.route('/analyze', methods=['POST'])
+def analyze_pdf():
     """
-    Receives a PDF file, extracts its text, and sends it to the Gemini API
-    to get a summary or analysis.
-    
-    This endpoint is for testing and demonstration purposes.
+    Endpoint to upload a PDF, extract text, and get the initial analysis.
+    The extracted text is stored in memory for follow-up questions.
     """
-    # Check if a file was included in the request
-    if 'pdf_file' not in request.files:
-        return jsonify({"error": "No file part in the request"}), 400
+    if not ai_client:
+        return jsonify({"error": "AI client is not initialized. Check API key."}), 500
+
+    if 'document' not in request.files:
+        return jsonify({"error": "No document file provided"}), 400
     
-    pdf_file = request.files['pdf_file']
+    pdf_file = request.files['document']
     
-    # Check if the file is empty
-    if pdf_file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
+    if pdf_file.filename == '' or not pdf_file.filename.endswith('.pdf'):
+        return jsonify({"error": "Please provide a valid PDF file"}), 400
+
+    try:
+        extracted_text = extract_text_from_pdf(pdf_file.stream)
+        if not extracted_text.strip():
+            return jsonify({"error": "Could not extract text from PDF"}), 400
+
+        # Store the text for the Q&A endpoint
+        document_context_store["text"] = extracted_text
         
-    # Process the file if it exists and is a PDF
-    if pdf_file and pdf_file.filename.endswith('.pdf'):
-        try:
-            # 1. Extract text from the PDF using your pdf_processor.py
-            print("Extracting text from PDF...")
-            extracted_text = extract_text_from_pdf(pdf_file)
-            
-            if not extracted_text.strip():
-                return jsonify({"error": "Could not extract text from the PDF. The file may be empty or encrypted."}), 400
+        # Get the analysis from the AI client
+        analysis_result = ai_client.analyze_document(extracted_text)
+        
+        if "error" in analysis_result:
+             return jsonify(analysis_result), 500
 
-            # 2. Get a response from the Gemini API using your ai_client.py
-            print("Sending extracted text to Gemini API...")
-            client = GeminiClient()
-            gemini_response = client.generate_response(extracted_text)
-            
-            # 3. Return the AI's response as a JSON object
-            return jsonify({"success": True, "gemini_response": gemini_response})
+        return jsonify(analysis_result)
 
-        except Exception as e:
-            # Catch any unexpected errors during the process
-            print(f"An unexpected error occurred: {e}")
-            return jsonify({"error": f"An internal server error occurred: {e}"}), 500
+    except Exception as e:
+        print(f"An error occurred in /analyze: {e}")
+        return jsonify({"error": "An internal server error occurred"}), 500
+
+@app.route('/ask', methods=['POST'])
+def ask_question():
+    """
+    Endpoint to ask a follow-up question about the most recently uploaded document.
+    """
+    if not ai_client:
+        return jsonify({"error": "AI client is not initialized. Check API key."}), 500
+
+    data = request.get_json()
+    if not data or 'question' not in data:
+        return jsonify({"error": "No question provided"}), 400
     
-    else:
-        return jsonify({"error": "Invalid file type. Please upload a PDF."}), 400
+    user_question = data['question']
+    
+    # Retrieve the stored document text
+    document_text = document_context_store.get("text")
+    
+    if not document_text:
+        return jsonify({"error": "No document has been analyzed yet. Please upload a document first."}), 400
 
-# --- Main entry point to run the server ---
+    try:
+        answer = ai_client.answer_question(document_text, user_question)
+        return jsonify({"answer": answer})
+
+    except Exception as e:
+        print(f"An error occurred in /ask: {e}")
+        return jsonify({"error": "An internal server error occurred"}), 500
+
+# --- Main entry point ---
 if __name__ == '__main__':
-    # To run this, you can use `python app.py` from your terminal
-    # The debug=True option will automatically reload the server on code changes
-    print("Starting Flask server...")
+    # Runs the server on http://127.0.0.1:5000
+    # The debug=True flag allows for hot-reloading when you save changes.
     app.run(debug=True, port=5000)
-

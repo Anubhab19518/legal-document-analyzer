@@ -1,0 +1,45 @@
+/* src/styles/globals.css */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss/preflight";
+@import "tailwindcss/utilities";
+
+@layer base {
+  :root {
+    --color-background: #FFFFFF;
+    --color-foreground: #FFFFFF;
+    --color-text-primary: #1a1a1a;
+    --color-text-secondary: #6b7280;
+    --color-accent: #3b82f6;
+    --color-destructive: #ef4444;
+    --color-border: #e5e7eb;
+    --color-muted: #f9fafb;
+  }
+
+  .dark {
+    --color-background: #0a0a0a;
+    --color-foreground: #1a1a1a;
+    --color-text-primary: #ffffff;
+    --color-text-secondary: #9ca3af;
+    --color-accent: #60a5fa;
+    --color-destructive: #f87171;
+    --color-border: #374151;
+    --color-muted: #111827;
+  }
+
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-text-primary);
+    font-family: 'Roboto', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}

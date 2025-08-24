@@ -1,11 +1,10 @@
 import './App.css'
+// src/App.tsx
+import { HomePage } from './pages/HomePage';
+import './styles/globals.css';
+
 function App() {
-  return (
-    <>
-
-
-      
-    </>
-  )
+  return <HomePage />;
 }
-export default App
+
+export default App;

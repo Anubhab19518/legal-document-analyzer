@@ -4,11 +4,9 @@ import type { Theme } from '../types';
 
 export const useTheme = () => {
   const [theme, setTheme] = useState<Theme>(() => {
-    // Check localStorage first, then system preference
+    // Always start with dark theme for the modern look
     const stored = localStorage.getItem('theme') as Theme;
-    if (stored) return stored;
-    
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    return stored || 'dark';
   });
 
   useEffect(() => {

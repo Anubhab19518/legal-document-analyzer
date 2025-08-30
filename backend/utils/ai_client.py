@@ -28,7 +28,6 @@ class GeminiClient:
         """
         Analyzes the full text of a legal document and returns a structured JSON.
         """
-        # This is a highly-tuned prompt for structured JSON output.
         prompt = f"""
         **Instruction:**
         You are an expert legal assistant named "Saral Kanoon" for an Indian audience. Your task is to analyze the provided legal document text and return a valid JSON object.
@@ -47,7 +46,6 @@ class GeminiClient:
         """
         try:
             response = self.model.generate_content(prompt)
-            # Clean the response to ensure it's valid JSON
             cleaned_response = response.text.strip().replace("```json", "").replace("```", "").strip()
             return json.loads(cleaned_response)
         except json.JSONDecodeError:
@@ -82,13 +80,53 @@ class GeminiClient:
         except Exception as e:
             print(f"Error during Q&A: {e}")
             return "Sorry, an error occurred while answering your question."
+    
+    def compare_documents(self, old_doc_text: str, new_doc_text: str) -> dict:
+        """
+        Compares two legal documents and highlights the differences and risks.
+        """
+        prompt = f"""
+        **Instruction:**
+        You are an expert legal assistant, "Saral Kanoon", specializing in contract comparison for an Indian audience.
+        Analyze the "Old Document" and the "New Document" provided below. Your goal is to identify all significant differences and assess the risk of these changes for the person signing the new contract.
 
-# --- Example Usage (for testing) ---
+        Your response MUST be a valid JSON object with four keys: "overallRiskAssessment", "newClauses", "removedClauses", and "modifiedClauses".
+
+        1.  **overallRiskAssessment**: An object with a "rating" (e.g., "Low Risk", "Medium Risk", "High Risk") and a "summary" explaining the overall implication of the changes.
+        2.  **newClauses**: An array of objects for clauses present in the New Document but absent in the Old. Each object must have a "title" and a "detail" explaining the new obligation or term.
+        3.  **removedClauses**: An array of objects for clauses from the Old Document that are now missing. Each object must have a "title" and a "detail" explaining what protection or term has been lost.
+        4.  **modifiedClauses**: This is the most important part. An array of objects for clauses that have been changed. Each object MUST have:
+            - "clauseTitle": The name of the clause (e.g., "Notice Period").
+            - "oldTextSummary": A brief summary of the clause in the Old Document.
+            - "newTextSummary": A brief summary of the clause in the New Document.
+            - "riskAnalysis": A clear explanation of the change's impact and any new risks involved.
+
+        **Old Document Text:**
+        ---
+        {old_doc_text}
+        ---
+
+        **New Document Text:**
+        ---
+        {new_doc_text}
+        ---
+
+        **JSON Response:**
+        """
+        try:
+            response = self.model.generate_content(prompt)
+            cleaned_response = response.text.strip().replace("```json", "").replace("```", "").strip()
+            return json.loads(cleaned_response)
+        except Exception as e:
+            print(f"Error during document comparison: {e}")
+            return {"error": "An error occurred during document comparison."}
+
+# --- Example Usage (for testing this file directly) ---
 if __name__ == '__main__':
     client = GeminiClient()
-    sample_text = "This agreement has a lock-in period of 6 months. If the Tenant vacates before this period, the security deposit shall be forfeited."
     
-    print("--- Testing Analysis ---")
+    print("--- Testing Single Document Analysis ---")
+    sample_text = "This agreement has a lock-in period of 6 months. If the Tenant vacates before this period, the security deposit shall be forfeited."
     analysis = client.analyze_document(sample_text)
     print(json.dumps(analysis, indent=2))
 
@@ -96,3 +134,9 @@ if __name__ == '__main__':
     question = "What happens if I leave early?"
     answer = client.answer_question(sample_text, question)
     print(f"Q: {question}\nA: {answer}")
+
+    print("\n--- Testing Document Comparison ---")
+    old_contract = "The notice period for termination is 30 days."
+    new_contract = "The notice period for termination is 60 days. The tenant must also pay a penalty of one month's rent if terminating before the full lease term."
+    comparison = client.compare_documents(old_contract, new_contract)
+    print(json.dumps(comparison, indent=2))

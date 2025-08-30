@@ -89,6 +89,43 @@ def ask_question():
     except Exception as e:
         print(f"An error occurred in /ask: {e}")
         return jsonify({"error": "An internal server error occurred"}), 500
+    
+@app.route('/compare', methods=['POST'])
+def compare_pdfs():
+    """
+    Endpoint to upload two PDFs, compare them, and return the differences.
+    """
+    if not ai_client:
+        return jsonify({"error": "AI client is not initialized"}), 500
+
+    if 'old_document' not in request.files or 'new_document' not in request.files:
+        return jsonify({"error": "Both 'old_document' and 'new_document' files are required"}), 400
+
+    old_pdf = request.files['old_document']
+    new_pdf = request.files['new_document']
+
+    if old_pdf.filename == '' or new_pdf.filename == '':
+        return jsonify({"error": "Please provide both documents"}), 400
+
+    try:
+        # Extract text from both documents
+        old_text = extract_text_from_pdf(old_pdf.stream)
+        new_text = extract_text_from_pdf(new_pdf.stream)
+
+        if not old_text.strip() or not new_text.strip():
+            return jsonify({"error": "Could not extract text from one or both PDFs."}), 400
+
+        # Call the new comparison method in the AI client
+        comparison_result = ai_client.compare_documents(old_text, new_text)
+
+        if "error" in comparison_result:
+            return jsonify(comparison_result), 500
+
+        return jsonify(comparison_result)
+
+    except Exception as e:
+        print(f"An error occurred in /compare: {e}")
+        return jsonify({"error": "An internal server error occurred"}), 500
 
 # --- Main entry point ---
 if __name__ == '__main__':

@@ -4,6 +4,7 @@ import os
 import json
 import google.generativeai as genai
 from dotenv import load_dotenv
+from gtts import gTTS
 
 # Load environment variables from a .env file
 load_dotenv()
@@ -120,6 +121,46 @@ class GeminiClient:
         except Exception as e:
             print(f"Error during document comparison: {e}")
             return {"error": "An error occurred during document comparison."}
+
+# --- Translation Utility ---
+def translate_text(text: str, target_lang: str) -> str:
+    """
+    Translate text to the target language using Gemini API.
+    """
+    # For demo: Use Gemini for translation, fallback to English if not supported
+    prompt = f"""
+    Translate the following text to {target_lang}:
+    ---
+    {text}
+    ---
+    Only return the translated text, no explanation.
+    """
+    try:
+        GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        response = model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+        print(f"Translation error: {e}")
+        return text
+
+# --- Text-to-Speech Utility ---
+def text_to_speech(text: str, lang: str) -> bytes:
+    """
+    Convert text to speech audio using gTTS.
+    Returns audio bytes (mp3).
+    """
+    try:
+        tts = gTTS(text=text, lang=lang)
+        from io import BytesIO
+        audio_fp = BytesIO()
+        tts.write_to_fp(audio_fp)
+        audio_fp.seek(0)
+        return audio_fp.read()
+    except Exception as e:
+        print(f"TTS error: {e}")
+        return b''
 
 # --- Example Usage (for testing this file directly) ---
 if __name__ == '__main__':

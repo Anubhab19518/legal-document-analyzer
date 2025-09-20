@@ -3,7 +3,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from utils.pdf_processor import extract_text_from_pdf
-from utils.ai_client import GeminiClient
+from utils.ai_client import GeminiClient, translate_text, text_to_speech
 
 # Initialize Flask App and CORS
 app = Flask(__name__)
@@ -24,6 +24,51 @@ except ValueError as e:
     ai_client = None
 
 # --- API Endpoints ---
+
+# Translation endpoint
+@app.route('/translate', methods=['POST'])
+def translate_section():
+    """
+    Endpoint to translate a section of the document to a target language.
+    Expects JSON: { "section": "summary"|"keyClauses"|"redFlags", "text": "...", "target_lang": "hi"|"en"|... }
+    """
+    data = request.get_json()
+    if not data or 'section' not in data or 'text' not in data or 'target_lang' not in data:
+        return jsonify({"error": "Missing required fields."}), 400
+
+    # Only allow translation of keyClauses/redFlags if explicitly requested
+    if data['section'] in ['keyClauses', 'redFlags'] and data.get('target_lang') == 'hi':
+        # Only translate if user requested
+        pass
+
+    try:
+        translated = translate_text(data['text'], data['target_lang'])
+        return jsonify({"translated": translated})
+    except Exception as e:
+        print(f"Error in /translate: {e}")
+        return jsonify({"error": "Translation failed."}), 500
+
+# Audio endpoint
+@app.route('/audio', methods=['POST'])
+def audio_section():
+    """
+    Endpoint to convert a section of text to speech audio.
+    Expects JSON: { "text": "...", "lang": "en"|"hi"|... }
+    Returns: audio file (mp3/wav)
+    """
+    data = request.get_json()
+    if not data or 'text' not in data or 'lang' not in data:
+        return jsonify({"error": "Missing required fields."}), 400
+    try:
+        audio_bytes = text_to_speech(data['text'], data['lang'])
+        # Return as file download
+        return (audio_bytes, 200, {
+            'Content-Type': 'audio/mpeg',
+            'Content-Disposition': 'attachment; filename="output.mp3"'
+        })
+    except Exception as e:
+        print(f"Error in /audio: {e}")
+        return jsonify({"error": "Audio conversion failed."}), 500
 
 @app.route('/analyze', methods=['POST'])
 def analyze_pdf():

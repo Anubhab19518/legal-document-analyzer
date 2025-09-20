@@ -5,6 +5,7 @@
 /* Removed Tailwind directives due to unknown at-rule error */
 /* If you intend to use Tailwind, ensure your build tool supports it. */
 
+
 @layer base {
   :root {
     --color-background: #0a0a0a;

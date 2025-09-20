@@ -48,3 +48,22 @@ export const askQuestion = async (question: string): Promise<{ answer: string }>
   const response = await apiClient.post<{ answer: string }>('/ask', { question });
   return response.data;
 };
+
+// Translate a section of the document
+export const translateSection = async (section: string, text: string, targetLang: string): Promise<string> => {
+  const response = await apiClient.post<{ translated: string }>('/translate', {
+    section,
+    text,
+    target_lang: targetLang,
+  });
+  return response.data.translated;
+};
+
+// Get audio for a section of text
+export const getAudio = async (text: string, lang: string): Promise<Blob> => {
+  const response = await apiClient.post<Blob>('/audio', {
+    text,
+    lang,
+  }, { responseType: 'blob' });
+  return response.data;
+};

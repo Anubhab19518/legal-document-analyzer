@@ -40,86 +40,57 @@ def process_page(args):
 
 def extract_text_from_pdf(pdf_stream):
     """
-    Extracts all text from a given PDF file stream.
-    If regular text extraction fails, falls back to using Gemini's vision capabilities.
+    Extracts all text from a given PDF file stream using parallel processing
+    with Gemini's vision capabilities.
 
     Args:
         pdf_stream: A file-like object (stream) of the PDF file.
-                    For example, the object you get from Flask's request.files.
+                   For example, the object you get from Flask's request.files.
 
     Returns:
         A single string containing all the text from the PDF,
-        or an empty string if both extraction methods fail.
+        or an empty string if extraction fails.
     """
     from .ai_client import GeminiClient
     
-    full_text = ""
-    pdf_bytes = pdf_stream.read()
-    
     try:
-        # Initialize Gemini client once for the entire process
         gemini = GeminiClient()
         print("Initialized Gemini client successfully")
         
-        # First attempt: Try regular text extraction
+        pdf_bytes = pdf_stream.read()
         with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
-            for page_num in range(len(doc)):
+            pages = []
+            total_pages = len(doc)
+            print(f"Processing {total_pages} pages in parallel...")
+
+            # Prepare all pages for parallel processing
+            for page_num in range(total_pages):
                 page = doc.load_page(page_num)
-                page_text = page.get_text("text")
-                
-                if not page_text.strip():  # If page has no extractable text
-                    print(f"Page {page_num + 1} has no extractable text, using vision model")
-                    # Get page as image and use Gemini Vision with higher quality
-                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x scale for better quality
-                    img_data = pix.tobytes("png")
-                    
-                    # Use Gemini Vision to extract text
-                    page_text = gemini.extract_text_from_image(img_data)
-                    print(f"Vision model extracted {len(page_text.split())} words from page {page_num + 1}")
+                pages.append((page, gemini, 1.5))  # Using 1.5x scale for a balance of quality and speed
+            
+            # Process pages in parallel
+            with concurrent.futures.ThreadPoolExecutor(max_workers=min(total_pages, 4)) as executor:
+                futures = list(executor.map(process_page, pages))
+            
+            # Combine results
+            full_text = ""
+            for page_num, text in enumerate(futures, 1):
+                if text.strip():
+                    print(f"Successfully extracted {len(text.split())} words from page {page_num}")
+                    full_text += text + "\n"
                 else:
-                    print(f"Successfully extracted {len(page_text.split())} words from page {page_num + 1}")
-                
-                full_text += page_text + "\n"
+                    print(f"Warning: No text extracted from page {page_num}")
             
             result = full_text.strip()
             if result:
-                print("Successfully extracted text from PDF")
+                print("Successfully extracted text from all pages")
                 return result
             else:
-                raise Exception("No text could be extracted from the document")
-
-    except Exception as primary_error:
-        # Handle potential errors and try full document vision analysis
-        print(f"Error in primary PDF processing: {primary_error}")
-        print("Attempting fallback using vision model for entire document...")
-        
-        try:
-            # Convert entire PDF to images and process with Gemini Vision
-            with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
-                gemini = GeminiClient()
-                for page_num in range(len(doc)):
-                    print(f"Processing page {page_num + 1} with vision model")
-                    page = doc.load_page(page_num)
-                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x scale for better quality
-                    img_data = pix.tobytes("png")
-                    page_text = gemini.extract_text_from_image(img_data)
-                    
-                    if page_text.strip():
-                        print(f"Successfully extracted {len(page_text.split())} words from page {page_num + 1}")
-                        full_text += page_text + "\n"
-                    else:
-                        print(f"Warning: No text extracted from page {page_num + 1}")
+                raise Exception("No text could be extracted from any page in the document")
                 
-                result = full_text.strip()
-                if result:
-                    print("Successfully extracted text using vision model")
-                    return result
-                else:
-                    raise Exception("No text could be extracted from the document using vision model")
-                
-        except Exception as e:
-            print(f"Error in fallback PDF processing: {e}")
-            return ""
+    except Exception as e:
+        print(f"Error in PDF processing: {e}")
+        return ""
 
 # --- Example Usage (for testing this file directly) ---
 # This part will only run when you execute `python pdf_processor.py`

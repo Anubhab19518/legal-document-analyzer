@@ -70,7 +70,7 @@ class GeminiClient:
         You are an expert legal assistant named "Saral Kanoon" for an Indian audience. Your task is to analyze the provided legal document text and return a valid JSON object.
         The JSON object must have three keys: "summary", "keyClauses", and "redFlags".
 
-        1.  **summary**: A concise, easy-to-understand summary of the document's main purpose in plain English.
+        1.  **summary**: A concise, easy-to-understand summary of the document's main purpose in plain and simple to understand English without using uncommon english words.
         2.  **keyClauses**: An array of objects, where each object represents one of the 3-5 most important clauses. Each object must have a "title" and a "detail" explaining its impact on the user.
         3.  **redFlags**: An array of objects identifying clauses that are risky, unfair, or unusual. Each object must have a "title" and a "detail" explaining the potential risk. If there are no red flags, return an empty array.
 
@@ -98,7 +98,7 @@ class GeminiClient:
         """
         prompt = f"""
         **Instruction:**
-        You are a Q&A assistant for "Saral Kanoon". Answer the user's question based *ONLY* on the provided document text.
+        You are a Q&A assistant for "Saral Kanoon". Answer the user's question in simplest english possible based *ONLY* on the provided document text.
         Do not use any external knowledge. If the answer is not in the document, you MUST state: "The answer to that question could not be found in the provided document."
 
         **Document Text:**

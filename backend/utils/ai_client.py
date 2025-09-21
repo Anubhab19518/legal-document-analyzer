@@ -24,6 +24,42 @@ class GeminiClient:
         
         genai.configure(api_key=GEMINI_API_KEY)
         self.model = genai.GenerativeModel(model_name)
+        # Initialize vision model for PDF processing
+        self.vision_model = genai.GenerativeModel('gemini-2.5-flash')
+
+    def extract_text_from_image(self, image_bytes: bytes) -> str:
+        """
+        Extracts text from a PDF page using Gemini's vision capabilities.
+        
+        Args:
+            image_bytes: The bytes of the PDF page rendered as an image
+            
+        Returns:
+            str: Extracted text from the image
+        """
+        from PIL import Image
+        import io
+        
+        prompt = """
+        Extract all text from this image. This is a page from a legal document.
+        Return only the extracted text, maintaining the original formatting where possible.
+        Do not include any additional commentary or analysis.
+        """
+        
+        try:
+            # Convert bytes to PIL Image
+            image = Image.open(io.BytesIO(image_bytes))
+            
+            # Create image parts for Gemini
+            image_part = {"mime_type": "image/png", "data": image_bytes}
+            
+            # Generate content with proper image formatting
+            response = self.vision_model.generate_content([prompt, image_part])
+            response.resolve()  # Ensure the response is complete
+            return response.text.strip()
+        except Exception as e:
+            print(f"Error in vision processing: {e}")
+            return ""
 
     def analyze_document(self, document_text: str) -> dict:
         """

@@ -1,4 +1,4 @@
-#⚖️ SaralKanoon - Legal Document Analyzer
+# ⚖️ SaralKanoon - Legal Document Analyzer
 
 **SaralKanoon** is an intelligent legal document analysis tool that simplifies the complexity of legal documents.  
 It provides **summaries**, **key clause explanations**, and **red flag detection** – helping users quickly understand contracts, agreements, and more.  
